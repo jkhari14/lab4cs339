@@ -86,7 +86,7 @@ public class BufferPool {
        }
 
       public void insertPageLockQueue(PageId pid, Permissions perm, TransactionId tid){
-            //*****ADD SUB-ROUTINE TO UPDATE THE DEPENDENCY GRAPH AND HANDLE ABORTS IF NECESSATY */
+            //*****ADD SUB-ROUTINE TO UPDATE THE DEPENDENCY GRAPH AND HANDLE ABORTS IF NECESSARY */
             TransactionOp newTransactionOp = new TransactionOp(tid, perm);
             if (this.pageLockQueue.containsKey(pid)){
                 this.pageLockQueue.get(pid).add(newTransactionOp); 
@@ -176,7 +176,8 @@ public class BufferPool {
                 this.lockManager.insertPageLockQueue(pid, perm, tid);
                 // *****UPDATE STATE OF WAIT ON GRAPH FOR DEADLOCK DETECTION
                 
-            } else { // IF THIS IS NOT A NEW PAGE
+            } 
+            else { // IF THIS IS NOT A NEW PAGE
                 if (this.lockManager.getPageLock(pid) == Permissions.READ_WRITE.toString()){
                     this.lockManager.setNumTransactionLocks(pid, 1);
                     this.lockManager.setLastTransaction(pid, tid);
@@ -187,7 +188,7 @@ public class BufferPool {
 
                 else if (perm == Permissions.READ_ONLY){ //IF THE TRANSACTION IS REQUESTING READ_ONLY PERMISSION
                     if (this.lockManager.getPageLock(pid) == Permissions.READ_ONLY.toString()){
-                        if (this.lockManager.getLastTransaction(pid) != tid){ // getLastTransaction may not be enough because certain requests should work for multiple transactions based on the pids permission
+                        if (this.lockManager.getLastTransaction(pid) != tid){ // WE WANT to see if the the page has a lock on the transaction, getLastTransaction may not be enough because certain requests should work for multiple transactions based on the pids permission
                             this.lockManager.incNumTransactionLocks(pid);
                             this.lockManager.setLastTransaction(pid, tid);
                             this.lockManager.insertPageLockQueue(pid, perm, tid);
@@ -195,11 +196,25 @@ public class BufferPool {
                     }
                     else if (this.lockManager.getPageLock(pid) == "CLOSED"){
                         // getLastTransaction may not be enough because certain requests should work for multiple transactions based on the pids permission
-                        this.lockManager.insertPageLockQueue(pid, perm, tid);
-                    }
-                    
-                
+                        if (!(this.lockManager.getLastTransaction(pid) == tid && this.lockManager.getNumTransactionLocks(pid) == 1)){
+                            this.lockManager.insertPageLockQueue(pid, perm, tid);
+                        }
+                        // else PROCEED and modify this page
+                    }  
                 else if (perm == Permissions.READ_WRITE){
+                    if (this.lockManager.getPageLock(pid) == Permissions.READ_ONLY.toString()){
+                        if (this.lockManager.getLastTransaction(pid) == tid && this.lockManager.getNumTransactionLocks(pid) == 1){
+                            this.lockManager.setPageLock(pid, perm);
+                        }
+                        else {
+                            this.lockManager.insertPageLockQueue(pid, perm, tid);
+                        }
+                    }
+                    else if (this.lockManager.getPageLock(pid) == "CLOSED"){
+                        if (!(this.lockManager.getLastTransaction(pid) == tid && this.lockManager.getNumTransactionLocks(pid) == 1)){
+                            this.lockManager.insertPageLockQueue(pid, perm, tid);
+                        }
+                    }
 
                 }
         }
